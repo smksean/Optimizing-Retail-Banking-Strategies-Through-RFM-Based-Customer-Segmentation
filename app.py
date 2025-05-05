@@ -130,7 +130,7 @@ if show_segment_table:
             "Long gone, infrequent, low spending"
         ]
     })
-    st.markdown("#### 📘 Segment Descriptions")
+    st.markdown(" ")
 for i, row in segment_info.iterrows():
     st.markdown(f"**{row['Segment Name']}** ({row['RFM Score Range']}): {row['Description']}")
 
