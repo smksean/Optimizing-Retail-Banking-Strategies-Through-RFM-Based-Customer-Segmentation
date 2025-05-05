@@ -32,7 +32,7 @@ with st.sidebar:
     show_top_customers = st.checkbox("Show Top Customers", value=True)
 
     st.markdown("---")
-    st.caption("Optimized for performance • Powered by Streamlit")
+    st.caption("Optimized for performance • Mobile-compatible")
 
 # === Filtered Data ===
 filtered_df = df[(df['Segment'].isin(segments)) & (df['Cluster'].isin(clusters))]
@@ -91,18 +91,18 @@ if show_segment_composition:
     }).rename(columns={'CustomerID': 'Customers', 'Monetary': 'Total Monetary'}).reset_index()
     comp_df['% of Customers'] = (comp_df['Customers'] / comp_df['Customers'].sum() * 100).round(1)
     comp_df['% of Value'] = (comp_df['Total Monetary'] / comp_df['Total Monetary'].sum() * 100).round(1)
-    st.dataframe(comp_df)
+    st.table(comp_df)
 
 # === Top Customers Table ===
 if show_top_customers:
     st.markdown("### 🏅 Top 10 High-Value Customers")
     top_customers = filtered_df.sort_values(by='Monetary', ascending=False).head(10)
-    st.dataframe(top_customers[['CustomerID', 'Recency', 'Frequency', 'Monetary', 'Segment', 'Cluster']])
+    st.table(top_customers[['CustomerID', 'Recency', 'Frequency', 'Monetary', 'Segment', 'Cluster']])
 
 # === Segment Info Table ===
 if show_segment_table:
     st.markdown("### 📘 Segment Description Table")
-    st.dataframe(pd.DataFrame({
+    segment_info = pd.DataFrame({
         "RFM Score Range": ["9–12", "6–8", "4–5", "1–3"],
         "Segment Name": ["Best Customers", "Loyal Customers", "At Risk", "Churned"],
         "Description": [
@@ -111,7 +111,8 @@ if show_segment_table:
             "Spending dropped, less frequent",
             "Long gone, infrequent, low spending"
         ]
-    }))
+    })
+    st.table(segment_info)
 
 # === Cluster Profile Table ===
 st.markdown("### 🔍 Cluster Profiles")
@@ -125,17 +126,18 @@ cluster_descriptions = {
 for c in sorted(df['Cluster'].unique()):
     with st.expander(f"Cluster {c}"):
         st.markdown(cluster_descriptions.get(c, "No description available."))
-        st.dataframe(df[df['Cluster'] == c][['CustomerID', 'Recency', 'Frequency', 'Monetary', 'Segment']].head(10))
+        st.table(df[df['Cluster'] == c][['CustomerID', 'Recency', 'Frequency', 'Monetary', 'Segment']].head(10))
 
 # === RFM Matrix Table ===
 if show_rfm_matrix:
     st.markdown("### 🧱 RFM Profile Table")
-    rfm_matrix = filtered_df.groupby('Cluster')[['Recency', 'Frequency', 'Monetary']].mean().round(1)
-    st.dataframe(rfm_matrix.style.background_gradient(cmap="Blues").format("{:.1f}"))
+    rfm_matrix = filtered_df.groupby('Cluster')[['Recency', 'Frequency', 'Monetary']].mean().round(1).reset_index()
+    st.table(rfm_matrix)
 
 # === Download Button ===
 st.markdown("### 💾 Export Data")
 st.download_button("📥 Download Filtered Data as CSV", data=filtered_df.to_csv(index=False), file_name="filtered_rfm.csv")
+
 
 
 
