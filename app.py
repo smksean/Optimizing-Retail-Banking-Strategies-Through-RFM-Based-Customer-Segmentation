@@ -91,13 +91,31 @@ if show_segment_composition:
     }).rename(columns={'CustomerID': 'Customers', 'Monetary': 'Total Monetary'}).reset_index()
     comp_df['% of Customers'] = (comp_df['Customers'] / comp_df['Customers'].sum() * 100).round(1)
     comp_df['% of Value'] = (comp_df['Total Monetary'] / comp_df['Total Monetary'].sum() * 100).round(1)
-    st.table(comp_df)
+    fig_comp = px.bar(
+    comp_df.sort_values(by='% of Value', ascending=False),
+    x='Segment',
+    y='% of Value',
+    text='% of Value',
+    color='Segment',
+    title="Customer Value Contribution by Segment"
+)
+st.plotly_chart(fig_comp, use_container_width=True)
+
 
 # === Top Customers Table ===
 if show_top_customers:
     st.markdown("### 🏅 Top 10 High-Value Customers")
     top_customers = filtered_df.sort_values(by='Monetary', ascending=False).head(10)
-    st.table(top_customers[['CustomerID', 'Recency', 'Frequency', 'Monetary', 'Segment', 'Cluster']])
+    fig_top = px.bar(
+    top_customers,
+    x='CustomerID',
+    y='Monetary',
+    color='Segment',
+    hover_data=['Recency', 'Frequency', 'Cluster'],
+    title="Top 10 Customers by Monetary Value"
+)
+st.plotly_chart(fig_top, use_container_width=True)
+
 
 # === Segment Info Table ===
 if show_segment_table:
@@ -112,7 +130,10 @@ if show_segment_table:
             "Long gone, infrequent, low spending"
         ]
     })
-    st.table(segment_info)
+    st.markdown("#### 📘 Segment Descriptions")
+for i, row in segment_info.iterrows():
+    st.markdown(f"**{row['Segment Name']}** ({row['RFM Score Range']}): {row['Description']}")
+
 
 # === Cluster Profile Table ===
 st.markdown("### 🔍 Cluster Profiles")
@@ -132,7 +153,16 @@ for c in sorted(df['Cluster'].unique()):
 if show_rfm_matrix:
     st.markdown("### 🧱 RFM Profile Table")
     rfm_matrix = filtered_df.groupby('Cluster')[['Recency', 'Frequency', 'Monetary']].mean().round(1).reset_index()
-    st.table(rfm_matrix)
+    fig_heat = go.Figure(data=go.Heatmap(
+    z=rfm_matrix[['Recency', 'Frequency', 'Monetary']].values,
+    x=['Recency', 'Frequency', 'Monetary'],
+    y=[f"Cluster {i}" for i in rfm_matrix['Cluster']],
+    colorscale='Blues',
+    showscale=True
+))
+fig_heat.update_layout(title='RFM Heatmap by Cluster')
+st.plotly_chart(fig_heat, use_container_width=True)
+
 
 # === Download Button ===
 st.markdown("### 💾 Export Data")
