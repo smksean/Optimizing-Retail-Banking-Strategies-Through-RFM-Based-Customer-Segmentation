@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 
-# Page setup
+# Page Configuration
 st.set_page_config(page_title="BankTrust RFM Dashboard", layout="wide", initial_sidebar_state="expanded")
 
-# === Load Data ===
+# Load Data with Cache
 @st.cache_data
 def load_data():
     return pd.read_csv("output/rfm_segmented.csv")
@@ -14,72 +15,94 @@ df = load_data()
 
 # === Sidebar ===
 with st.sidebar:
-    st.title("🛠️ Dashboard Controls")
+    st.title("🔧 Dashboard Controls")
+    st.markdown("Filter and display analysis insights from RFM segments and clusters.")
 
-    st.markdown("### 🎯 Filter Customers")
-    segments = st.multiselect("Segment", options=sorted(df['Segment'].unique()), default=df['Segment'].unique())
-    clusters = st.multiselect("Cluster", options=sorted(df['Cluster'].unique()), default=sorted(df['Cluster'].unique()))
+    st.subheader("🎯 Customer Filters")
+    segments = st.multiselect("Select Segment", options=sorted(df['Segment'].unique()), default=sorted(df['Segment'].unique()))
+    clusters = st.multiselect("Select Cluster", options=sorted(df['Cluster'].unique()), default=sorted(df['Cluster'].unique()))
 
-    st.markdown("### 📊 What to Show")
-    show_profiles = st.checkbox("Cluster Profiles", value=False)
-    show_scatter = st.checkbox("RFM Scatter", value=False)
-    show_boxplots = st.checkbox("RFM Boxplots", value=False)
-    show_segment_table = st.checkbox("Segment Info Table", value=False)
+    st.subheader("📊 Toggle Views")
+    show_cluster_distribution = st.checkbox("Show Cluster Size Bar", value=True)
+    show_segment_funnel = st.checkbox("Show Segment Value Funnel", value=True)
+    show_rfm_matrix = st.checkbox("Show RFM Heat Table", value=True)
+    show_segment_table = st.checkbox("Show Segment Info Table", value=True)
+    show_lifecycle_pie = st.checkbox("Show Segment Lifecycle Pie", value=True)
+    show_segment_composition = st.checkbox("Show Segment Composition Table", value=True)
+    show_top_customers = st.checkbox("Show Top Customers", value=True)
 
     st.markdown("---")
-    st.caption("⚡ Optimized for Performance")
+    st.caption("Optimized for performance • Powered by Streamlit")
 
 # === Filtered Data ===
 filtered_df = df[(df['Segment'].isin(segments)) & (df['Cluster'].isin(clusters))]
 
-# === Dashboard Header ===
-st.title("🏦 BankTrust RFM Dashboard")
-st.markdown("Identify customer groups using **Recency, Frequency, Monetary** scores for targeted marketing and retention.")
+# === Main Title ===
+st.title("🏦 BankTrust RFM Segmentation Dashboard")
+st.markdown("Segment and prioritize customers based on **Recency**, **Frequency**, and **Monetary** behavior for marketing and retention strategy.")
 
-# === KPI Metrics ===
-st.markdown("### 📈 Customer Metrics")
+# === KPIs ===
+st.markdown("### 📈 Customer Snapshot")
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Total Customers", len(filtered_df))
 col2.metric("Avg. Recency", f"{filtered_df['Recency'].mean():.1f} days")
 col3.metric("Avg. Frequency", f"{filtered_df['Frequency'].mean():.1f} txns")
 col4.metric("Avg. Monetary", f"₹{filtered_df['Monetary'].mean():,.0f}")
 
-# === Cluster Descriptions + RFM Bar Chart ===
-if show_profiles:
-    st.markdown("### 🔎 Cluster Insights")
-    cluster_descriptions = {
-        0: "💰 High-value, frequent, recent – VIPs.",
-        1: "⏳ Recent but less frequent – re-engage them.",
-        2: "📉 Low activity and value – low ROI or new.",
-        3: "⚠️ High recency, low frequency – likely to churn."
-    }
+# === Cluster Size Bar Chart ===
+if show_cluster_distribution:
+    st.markdown("### 👥 Cluster Size Distribution")
+    cluster_counts = filtered_df['Cluster'].value_counts().sort_index()
+    fig_cluster_bar = px.bar(
+        x=cluster_counts.index,
+        y=cluster_counts.values,
+        labels={'x': 'Cluster', 'y': 'Number of Customers'},
+        color=cluster_counts.index.astype(str),
+        title="Customer Count per Cluster"
+    )
+    st.plotly_chart(fig_cluster_bar, use_container_width=True)
 
-    # Summary expandable views
-    for c in sorted(filtered_df['Cluster'].unique()):
-        with st.expander(f"Cluster {c}"):
-            st.markdown(cluster_descriptions.get(c, "No description."))
-            preview = filtered_df[filtered_df['Cluster'] == c].head(5)
-            st.dataframe(preview[['CustomerID', 'Recency', 'Frequency', 'Monetary', 'Segment']], use_container_width=True)
+# === Segment Funnel Chart ===
+if show_segment_funnel:
+    st.markdown("### 🔄 Segment Value Funnel")
+    seg_mon = filtered_df.groupby('Segment')['Monetary'].mean().sort_values(ascending=False).reset_index()
+    fig_funnel = go.Figure(go.Funnel(
+        y=seg_mon['Segment'],
+        x=seg_mon['Monetary'],
+        textinfo="value+percent initial"
+    ))
+    fig_funnel.update_layout(title="Average Monetary Value by Segment (Funnel View)")
+    st.plotly_chart(fig_funnel, use_container_width=True)
 
-    # Average RFM per cluster
-    rfm_avg = filtered_df.groupby('Cluster')[['Recency', 'Frequency', 'Monetary']].mean().reset_index()
-    rfm_long = rfm_avg.melt(id_vars='Cluster', var_name='Metric', value_name='Value')
-    fig_bar = px.bar(rfm_long, x='Cluster', y='Value', color='Metric', barmode='group',
-                     title='Avg. RFM Metrics per Cluster')
-    st.plotly_chart(fig_bar, use_container_width=True)
+# === Lifecycle Pie Chart ===
+if show_lifecycle_pie:
+    st.markdown("### 📊 Customer Lifecycle Distribution")
+    seg_dist = filtered_df['Segment'].value_counts().reset_index()
+    seg_dist.columns = ['Segment', 'Count']
+    fig_pie = px.pie(seg_dist, names='Segment', values='Count', hole=0.4, title="Customer Lifecycle Segment Share")
+    st.plotly_chart(fig_pie, use_container_width=True)
 
-# === Segment Pie Chart ===
-st.markdown("### 🧩 Segment Distribution")
-segment_counts = filtered_df['Segment'].value_counts().reset_index()
-segment_counts.columns = ['Segment', 'Count']
-fig_pie = px.pie(segment_counts, names='Segment', values='Count',
-                 title='Customer Segment Distribution', hole=0.4)
-st.plotly_chart(fig_pie, use_container_width=True)
+# === Segment Composition Table ===
+if show_segment_composition:
+    st.markdown("### 📋 Segment Composition Overview")
+    comp_df = filtered_df.groupby('Segment').agg({
+        'CustomerID': 'count',
+        'Monetary': 'sum'
+    }).rename(columns={'CustomerID': 'Customers', 'Monetary': 'Total Monetary'}).reset_index()
+    comp_df['% of Customers'] = (comp_df['Customers'] / comp_df['Customers'].sum() * 100).round(1)
+    comp_df['% of Value'] = (comp_df['Total Monetary'] / comp_df['Total Monetary'].sum() * 100).round(1)
+    st.dataframe(comp_df)
 
-# === Segment Description Table ===
+# === Top Customers Table ===
+if show_top_customers:
+    st.markdown("### 🏅 Top 10 High-Value Customers")
+    top_customers = filtered_df.sort_values(by='Monetary', ascending=False).head(10)
+    st.dataframe(top_customers[['CustomerID', 'Recency', 'Frequency', 'Monetary', 'Segment', 'Cluster']])
+
+# === Segment Info Table ===
 if show_segment_table:
-    st.markdown("### 📘 Segment Info")
-    seg_table = pd.DataFrame({
+    st.markdown("### 📘 Segment Description Table")
+    st.dataframe(pd.DataFrame({
         "RFM Score Range": ["9–12", "6–8", "4–5", "1–3"],
         "Segment Name": ["Best Customers", "Loyal Customers", "At Risk", "Churned"],
         "Description": [
@@ -88,31 +111,31 @@ if show_segment_table:
             "Spending dropped, less frequent",
             "Long gone, infrequent, low spending"
         ]
-    })
-    st.dataframe(seg_table, use_container_width=True)
+    }))
 
-# === Scatter Plot ===
-if show_scatter:
-    st.markdown("### 🧬 RFM Bubble Chart")
-    fig_scatter = px.scatter(
-        filtered_df, x='Recency', y='Monetary',
-        size='Frequency', color='Cluster',
-        hover_data=['CustomerID', 'Segment'],
-        title="Recency vs. Monetary (Bubble = Frequency)"
-    )
-    st.plotly_chart(fig_scatter, use_container_width=True)
+# === Cluster Profile Table ===
+st.markdown("### 🔍 Cluster Profiles")
+cluster_descriptions = {
+    0: "💰 High-value, frequent, recent – VIPs.",
+    1: "⏳ Recent but less frequent – responsive to re-engagement.",
+    2: "📉 Low activity and value – low ROI or new.",
+    3: "⚠️ High recency, low frequency – at risk of churning."
+}
 
-# === Boxplots ===
-if show_boxplots:
-    st.markdown("### 📦 RFM Boxplots by Cluster")
-    for metric in ['Recency', 'Frequency', 'Monetary']:
-        fig_box = px.box(filtered_df, x='Cluster', y=metric, color='Cluster',
-                         title=f"{metric} by Cluster")
-        st.plotly_chart(fig_box, use_container_width=True)
+for c in sorted(df['Cluster'].unique()):
+    with st.expander(f"Cluster {c}"):
+        st.markdown(cluster_descriptions.get(c, "No description available."))
+        st.dataframe(df[df['Cluster'] == c][['CustomerID', 'Recency', 'Frequency', 'Monetary', 'Segment']].head(10))
+
+# === RFM Matrix Table ===
+if show_rfm_matrix:
+    st.markdown("### 🧱 RFM Profile Table")
+    rfm_matrix = filtered_df.groupby('Cluster')[['Recency', 'Frequency', 'Monetary']].mean().round(1)
+    st.dataframe(rfm_matrix.style.background_gradient(cmap="Blues").format("{:.1f}"))
 
 # === Download Button ===
-st.markdown("### 💾 Download Filtered Data")
-st.download_button("📥 Download CSV", data=filtered_df.to_csv(index=False), file_name="filtered_rfm.csv")
+st.markdown("### 💾 Export Data")
+st.download_button("📥 Download Filtered Data as CSV", data=filtered_df.to_csv(index=False), file_name="filtered_rfm.csv")
 
 
 
